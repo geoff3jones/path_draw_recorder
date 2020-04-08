@@ -1,23 +1,21 @@
 import copy
 import time
 import numpy as np
+import pandas as pd
 
 class PathsList():
-    def __init__(self, seed=None):
-        self._seed = seed
+    def __init__(self):
         self._pathlist = []
-        if seed is not None:
-            np.random.seed(seed)
-        self._MT_STATE = np.random.get_state()
 
     def get_list(self):
         return self._pathlist
 
-    def serialise(self):
-        pass
+    def get_dataframe(self):
+        return pd.DataFrame.from_dict([path.as_dict() for path in self._pathlist
+                                       ])
 
     def __str__(self):
-        return f"({self._MT_STATE}, {self._pathlist})"
+        return f"({self._pathlist})"
 
     def __repr__(self):
         return str(self)
@@ -38,6 +36,13 @@ class DrawnPath():
 
     def __repr__(self):
         return str(self)
+
+    def as_dict(self):
+        d = copy.deepcopy(self.target_settings)
+        d['x pos'] = self.drawn_data[:,0].copy()
+        d['y pos'] = self.drawn_data[:,0].copy()
+        d['t'] = self.drawn_data[:,0].copy()
+        return d
 
     @property
     def size(self):

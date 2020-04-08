@@ -1,4 +1,6 @@
 env
+env64
+output
 
 # curl http://gitignore.io/api/python,opencv,visualstudiocode,git > .gitignore
 # Created by https://www.gitignore.io/api/python,opencv,visualstudiocode,git

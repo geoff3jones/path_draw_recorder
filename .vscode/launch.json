@@ -9,7 +9,12 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}\\src\\main.py",
-            "args":["--seed=1000000"],
+            "args": [
+                "--seed", "1000000",
+                "--outfile", "output\\test.parquet",
+                "--outtype", "parquet",
+                "-i", "1", "-n", "1"
+            ],
             "console": "integratedTerminal"
         }
     ]
