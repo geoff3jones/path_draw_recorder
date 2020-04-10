@@ -1,4 +1,6 @@
 from argparse import ArgumentParser
+import uuid 
+import sys
 
 import cv2
 import numpy as np
@@ -7,13 +9,12 @@ import pandas as pd
 from drawnpath import get_drawnpath_factory
 from drawnpath import PathsList
 
-np.set_printoptions(threshold=50)
+#np.set_printoptions(threshold=50)
 
 # Create a black image, a window and bind the function to window
 img = np.zeros((512, 512, 3), np.uint8)
 # mouse callback function
 
-pathslist = PathsList()
 
 class PathCaptureSettings():
     def __init__(self, parsed_args):
@@ -23,12 +24,25 @@ class PathCaptureSettings():
 
         if parsed_args.seed is not None:
             np.random.seed(parsed_args.seed)
+        if parsed_args.seed_state is not None:
+            np.random.set_state(parsed_args.seed_state)
         # store the MT19937 initial sate
         (self._rnd_mt_str,
          self._rnd_mt_keys,
          self._rnd_mt_pos,
          self._rnd_mt_has_gauss,
          self._rnd_mt_gauss_cached) = np.random.get_state()
+
+    def get_seed_state_tuple(self):
+        return (self._rnd_mt_str, self._rnd_mt_keys, self._rnd_mt_pos,
+                self._rnd_mt_has_gauss, self._rnd_mt_gauss_cached)
+
+    def get_seed_state_dict(self):
+        return {"ENGINE":       self._rnd_mt_str,
+                "KEYS":         self._rnd_mt_keys,
+                "POS":          self._rnd_mt_pos,
+                "HAS_GAUSS":    self._rnd_mt_has_gauss,
+                "CACHED_GAUSS": self._rnd_mt_gauss_cached}
 
     @property
     def paths_remaining(self):
@@ -47,7 +61,7 @@ class PathCaptureSettings():
     def get_next_settings(self):
         for i in range(self._itmax):
             for p in range(self._npaths):
-                self._reset_random(p*256)
+                self._reset_random(p*257)
                 yield (self._get_next_settings(), i, p)
 
     def _get_next_settings(self):
@@ -100,7 +114,7 @@ class PathCaptureSettings():
                     thickness=2)
 
 
-def get_draw_callback(path_capture_settings):
+def get_draw_callback(path_capture_settings, pathslist):
     factory = None
     settings_gen = path_capture_settings.get_next_settings()
     settings = None
@@ -132,15 +146,19 @@ def get_draw_callback(path_capture_settings):
     return draw_callback
 
 def parse_args():
-    global pathslist
     parser = ArgumentParser()
     parser.add_argument("-o", "--outfile", dest="outfile", required=True,  # type=String,
-                        help="output file name to save the results data frame to")
-    parser.add_argument("-t", "--outtype", dest="outtype", default="parquet",
-                        choices=["parquet", "csv"], 
+                        help="output file name [less extension] to save the"
+                        " results data frame to")
+    parser.add_argument("-t", "--outtype", dest="outtype", default="pickle",
+                        choices=["pickle", "csv"], 
                         help="output file name to save the results data frame to")
     parser.add_argument("-s", "--seed", dest="seed", type=int, default=None,
                         help="set a seed value for the random shape generator for repeatability",
+                        )
+    parser.add_argument("-S", "--seedfile", dest="seedfile", default=None,
+                        help="set a seed state from pickle file this would have"
+                        " been created in a previous run",
                         )
     parser.add_argument("-n", "--npaths", dest="npaths", type=int, default=25,
                         help="the number of paths to record")
@@ -148,15 +166,23 @@ def parse_args():
                         help="the number times to record each path")
     args = parser.parse_args()
 
+    if args.seedfile is not None:
+        print("loading pickled seed state")
+        state = pd.read_pickle(args.seedfile)
+        args.seed_state = tuple(v for v in state.to_dict()[0].values())
+    else:
+        args.seed_state = None
+
     return args
 
 if __name__ == "__main__":
 
+    pathslist = PathsList()
     args = parse_args()
     path_capture_settings = PathCaptureSettings(args)
 
     cv2.namedWindow('image')
-    cv2.setMouseCallback('image', get_draw_callback(path_capture_settings))
+    cv2.setMouseCallback('image', get_draw_callback(path_capture_settings, pathslist))
 
     while(path_capture_settings.paths_remaining):
         cv2.imshow('image', img)
@@ -167,12 +193,36 @@ if __name__ == "__main__":
     cv2.imshow('image', img)
 
 
+    state_d = path_capture_settings.get_seed_state_tuple()
+    state_df = pd.DataFrame.from_dict(state_d)
     df = pathslist.get_dataframe()
-    if args.outtype == "parquet":
-        df.to_parquet(args.outfile)
-    elif args.filetype == "csv":
-        df.to_csv(args.outfile)
-    else:
-        print("unknown export file type")
+    try:
+        if args.outtype == "pickle":
+            df.to_pickle(f"{args.outfile}.bz2.pkl", compression="bz2")
+        elif args.filetype == "csv":
+            df.to_csv(args.outfile)
+        else:
+            print("unknown export file type")
+        # save rndm state
+        state_df.to_pickle(f"{args.outfile}.seedstate.pkl")
+
+    except FileNotFoundError:
+        outfile = f".temp.{uuid.uuid4().hex}"
+        if args.outtype == "pickle":
+            outfile = f"{outfile}.bz2.pkl"
+            df.to_pickle(outfile, compression="bz2")
+        elif args.filetype == "csv":
+            outfile = f"{outfile}.csv"
+            df.to_csv(outfile)
+        # save rndm state
+        state_df.to_pickle(f"{outfile}.seedstate.pkl")
+
+        print(f"""couldn't write to the path:
+        \"{args.outfile}\"
+        instead writing to th temporary file
+        {outfile}""")
+    
+    
+
 
     cv2.destroyAllWindows()

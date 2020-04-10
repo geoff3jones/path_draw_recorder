@@ -5,17 +5,47 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "Python: Main",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}\\src\\main.py",
             "args": [
-                "--seed", "1000000",
-                "--outfile", "output\\test.parquet",
-                "--outtype", "parquet",
-                "-i", "1", "-n", "1"
+                "--seed",
+                "1000000",
+                "--outfile",
+                "outputs\\test.bz2.pkl",
+                "--outtype",
+                "pickle",
+                "-i",
+                "1",
+                "-n",
+                "1"
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Tests",
+            "type": "python",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}\\src\\tests.py",
+            "args": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Docker: Python - General",
+            "type": "docker",
+            "request": "launch",
+            "preLaunchTask": "docker-run: debug",
+            "python": {
+                "pathMappings": [
+                    {
+                        "localRoot": "${workspaceFolder}",
+                        "remoteRoot": "/app"
+                    }
+                ],
+                "projectType": "general"
+            }
         }
     ]
 }

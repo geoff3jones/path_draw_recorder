@@ -1,6 +1,15 @@
 env
 env64
+env_min
 output
+.temp.*
+*.parquet
+*.bz2.pkl
+*.pkl
+*.csv
+
+crash
+crash_nix
 
 # curl http://gitignore.io/api/python,opencv,visualstudiocode,git > .gitignore
 # Created by https://www.gitignore.io/api/python,opencv,visualstudiocode,git
