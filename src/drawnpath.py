@@ -40,8 +40,8 @@ class DrawnPath():
     def as_dict(self):
         d = copy.deepcopy(self.target_settings)
         d['x pos'] = self.drawn_data[:,0].copy()
-        d['y pos'] = self.drawn_data[:,0].copy()
-        d['t'] = self.drawn_data[:,0].copy()
+        d['y pos'] = self.drawn_data[:,1].copy()
+        d['t'] = self.drawn_data[:,2].copy()
         return d
 
     @property

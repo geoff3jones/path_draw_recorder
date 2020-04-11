@@ -151,7 +151,7 @@ def parse_args():
                         help="output file name [less extension] to save the"
                         " results data frame to")
     parser.add_argument("-t", "--outtype", dest="outtype", default="pickle",
-                        choices=["pickle", "csv"], 
+                        choices=["pickle", "parquet", "csv"], 
                         help="output file name to save the results data frame to")
     parser.add_argument("-s", "--seed", dest="seed", type=int, default=None,
                         help="set a seed value for the random shape generator for repeatability",
@@ -199,6 +199,8 @@ if __name__ == "__main__":
     try:
         if args.outtype == "pickle":
             df.to_pickle(f"{args.outfile}.bz2.pkl", compression="bz2")
+        elif args.filetype == "parquet":
+            df.to_parquet(args.outfile)
         elif args.filetype == "csv":
             df.to_csv(args.outfile)
         else:
@@ -211,6 +213,9 @@ if __name__ == "__main__":
         if args.outtype == "pickle":
             outfile = f"{outfile}.bz2.pkl"
             df.to_pickle(outfile, compression="bz2")
+        elif args.filetype == "parquet":
+            outfile = f"{outfile}.parquet"
+            df.to_parquet(outfile)
         elif args.filetype == "csv":
             outfile = f"{outfile}.csv"
             df.to_csv(outfile)
