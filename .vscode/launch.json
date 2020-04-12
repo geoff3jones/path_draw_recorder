@@ -33,6 +33,14 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "Python: ellipse",
+            "type": "python",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "${workspaceFolder}\\src\\ellipse.py",
+            "args": [],
+            "console": "integratedTerminal"
+        },{
             "name": "Docker: Python - General",
             "type": "docker",
             "request": "launch",

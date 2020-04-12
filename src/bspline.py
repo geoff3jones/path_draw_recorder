@@ -203,13 +203,13 @@ if __name__ == "__main__":
         print(bs_char.to_dict())
         return bs_char.draw_iterative_highlight_ends()
 
-    char_cycle = None
+    char_cycle = iter([])
     def cycle_char():
         global char_cycle
         img[:] = 0
         try:
             next(char_cycle)
-        except:
+        except StopIteration as e:
             char_cycle = new_char()
             cycle_char()
         
