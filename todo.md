@@ -1,18 +1,16 @@
 # in progress
 
-- move the all random state stuff into once class
-- save to disk pandas
+- make stroke recorder use the bspline character generation
 
 # todo
 
-- add other template stroke shapes
-    - spirale
-    - angular
-    - wave
-    - self intersect ( $\alpha$ )
 
 # done
 
+- add other template stroke shapes
+    - bspline
+- move the all random state stuff into once class
+- save to disk pandas
 - basic impl
 - generate random ellipse arcs
 - colour the ends of the arc

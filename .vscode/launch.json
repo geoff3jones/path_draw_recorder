@@ -24,11 +24,11 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Python: Tests",
+            "name": "Python: bspline",
             "type": "python",
             "request": "launch",
             "justMyCode": false,
-            "program": "${workspaceFolder}\\src\\tests.py",
+            "program": "${workspaceFolder}\\src\\bspline.py",
             "args": [],
             "console": "integratedTerminal"
         },
