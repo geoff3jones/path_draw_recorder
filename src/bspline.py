@@ -9,6 +9,8 @@ class Bspline:
 
     def __init__(self, control_points=None, order="quadratic", knotvector=None,
                  boundingbox=None, max_complexity=None):
+        self._mt_pos = np.random.get_state()[2]
+
         self._order = order
         if self._order == "linear":
             self._k = 2
@@ -84,7 +86,8 @@ class Bspline:
         $$
         given $ t_{min} \lte t \lt t_{max} $
         """
-        if self._sample_points is None:
+        if self._sample_points is None or \
+            samples_per_n*self._n != self._control_pts.shape[1]:
             self.gen_sample_points(samples_per_n)
         self.draw_sample_points()
         if show_ends:
@@ -112,7 +115,17 @@ class Bspline:
             return _i_km + _ip_km
 
     def __str__(self):
-        return f"{self._k} {self._n } {self._knotvector} "
+        return f"{self._k} {self._n } {self._knotvector}"
+
+    def to_dict(self):
+        return dict(
+            mt_pos=self._mt_pos,
+            shape='bspline',
+            order=self._order,
+            k=self._k,
+            knotvector=self._knotvector,
+            controlpoints=self._control_pts
+        )
 
     def boundingbox(self):
         if self._boundingbox_xy is None:
@@ -126,30 +139,81 @@ class Bspline:
 
         return (self._boundingbox_xy, self._boundingbox_aex)
 
+class BSplineGroup():
+
+    def __init__(self, samples_per_n):
+        self._mt_pos = np.random.get_state()[2]
+        self._samples_per_n = samples_per_n
+
+        self._chr_centre = Bspline(order="cubic",
+                                   boundingbox=[[100, 400], [100, 400]],
+                                   max_complexity=6)
+        self._chr_centre.gen_sample_points(self._samples_per_n)
+        _, bb = self._chr_centre.boundingbox()
+        bb_ul = [[bb[0, 0], bb[0, 0]+bb[1, 0]//2],
+                 [bb[0, 1], bb[0, 1]+100]]
+        bb_ur = [[bb[0, 0]+bb[1, 0]//2, bb[0, 0] + bb[1, 0]],
+                 [bb[0, 1], bb[0, 1]+100]]
+        self._chr_accent_ul = Bspline(order="quadratic",
+                                      boundingbox=bb_ul,
+                                      max_complexity=1)
+        self._chr_accent_ur = Bspline(order="quadratic",
+                                      boundingbox=bb_ur,
+                                      max_complexity=1)
+
+    def to_dict(self):
+        d = {'mt_pos': self._mt_pos,
+             'n_subpaths': 3}
+        for k, v in self._chr_centre.to_dict().items():
+            d[f"center.{k}"] = v
+        for k, v in self._chr_accent_ul.to_dict().items():
+            d[f"accent_ul.{k}"] = v
+        for k,v in self._chr_accent_ur.to_dict().items():
+            d[f"accent_ur.{k}"] = v
+        return d    
+
+    def draw(self, img, highlight_ends=False):
+        self._chr_centre.draw(img, self._samples_per_n,
+                             show_ends=highlight_ends)
+        self._chr_accent_ul.draw(img, self._samples_per_n,
+                                show_ends=highlight_ends)
+        self._chr_accent_ur.draw(img, self._samples_per_n,
+                             show_ends=highlight_ends)
+    
+    def draw_iterative_highlight_ends(self):
+        for ends in ['centre','accent_left','accent_right']:
+            self._chr_centre.draw(img, self._samples_per_n,
+                                show_ends=ends=='centre')
+            self._chr_accent_ul.draw(img, self._samples_per_n//3,
+                                    show_ends=ends=='accent_left')
+            self._chr_accent_ur.draw(img, self._samples_per_n//3,
+                                show_ends=ends=='accent_right')
+            yield ends
+
+
+
 if __name__ == "__main__":
     import cv2
 
     img=np.zeros((500, 500, 3), np.uint8)
-    def draw_bspline():
-        img[:]=0
-        bs=Bspline(order="cubic",
-                   boundingbox=[[100, 400], [100, 400]],
-                   max_complexity=6)
-        bs.draw(img, 300)
-        _,bb = bs.boundingbox()
-        bb_ul = [[bb[0,0], bb[0,0]+bb[1,0]//2],
-                 [bb[0,1],bb[0,1]+100]]
-        bb_ur = [[bb[0,0]+bb[1,0]//2, bb[0,0] + bb[1,0]],
-                 [bb[0,1],bb[0,1]+100]]
-        bs=Bspline(order="quadratic",
-                     boundingbox=bb_ul,
-                     max_complexity=1)
-        bs.draw(img, 300)
-        bs=Bspline(order="quadratic",
-                   boundingbox=bb_ur,
-                   max_complexity=1)
-        bs.draw(img, 300)
-        print(bs)
+
+    def new_char():
+        bs_char = BSplineGroup(300)
+        #bs_char.draw_bspline(img,'centre')
+        print(bs_char.to_dict())
+        return bs_char.draw_iterative_highlight_ends()
+
+    char_cycle = None
+    def cycle_char():
+        global char_cycle
+        img[:] = 0
+        try:
+            next(char_cycle)
+        except:
+            char_cycle = new_char()
+            cycle_char()
+        
+
 
     while(True):
         cv2.imshow('image', img)
@@ -157,6 +221,6 @@ if __name__ == "__main__":
         if key == 27:
             break
         if key == 32:
-            draw_bspline()
+            cycle_char()
 
     cv2.destroyAllWindows()
