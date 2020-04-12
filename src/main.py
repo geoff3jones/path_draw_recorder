@@ -69,7 +69,7 @@ class PathCaptureSettings():
         state_pos  = np.random.get_state()[2]
 
         startAngle = np.random.rand()*360.0
-        arclength  = 40 + np.sum(np.random.rand(2))*150.0
+        arclength  = 60 + np.sum(np.random.rand(2))*140.0
         direction  = np.random.choice([-1, 1])
         settings = {'MT_STATE_POS': state_pos,
                     'shape':        'ellipse',
@@ -199,10 +199,10 @@ if __name__ == "__main__":
     try:
         if args.outtype == "pickle":
             df.to_pickle(f"{args.outfile}.bz2.pkl", compression="bz2")
-        elif args.filetype == "parquet":
-            df.to_parquet(args.outfile)
-        elif args.filetype == "csv":
-            df.to_csv(args.outfile)
+        elif args.outtype == "parquet":
+            df.to_parquet(f"{args.outfile}.parquet")
+        elif args.outtype == "csv":
+            df.to_csv(f"{args.outfile}.csv")
         else:
             print("unknown export file type")
         # save rndm state
@@ -213,10 +213,10 @@ if __name__ == "__main__":
         if args.outtype == "pickle":
             outfile = f"{outfile}.bz2.pkl"
             df.to_pickle(outfile, compression="bz2")
-        elif args.filetype == "parquet":
+        elif args.outtype == "parquet":
             outfile = f"{outfile}.parquet"
             df.to_parquet(outfile)
-        elif args.filetype == "csv":
+        elif args.outtype == "csv":
             outfile = f"{outfile}.csv"
             df.to_csv(outfile)
         # save rndm state
