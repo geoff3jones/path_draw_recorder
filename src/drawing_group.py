@@ -1,5 +1,6 @@
 import time
 import functools
+import numpy as np
 
 def newDrawingGroup(GroupType,cached=False):
     """
@@ -28,7 +29,7 @@ def _newDrawingGroup_uncached(GroupType):
 
         def __init__(self, *args, **kwargs):
             super(DrawingGroup, self).__init__(*args, **kwargs)
-            self._drawn_paths = ([[]]*super(DrawingGroup,self).n_subpaths())
+            self._drawn_paths = tuple(list() for _ in range(super(DrawingGroup,self).n_subpaths()))
             self._active_subpath = 0
             self._start = 0
             DrawingGroup._pathslist.append(self)
@@ -36,7 +37,10 @@ def _newDrawingGroup_uncached(GroupType):
         def to_dict(self):
             d = super(DrawingGroup, self).to_dict()
             for i, p in enumerate(self._drawn_paths):
-                d[f"path[{i}].drawn"] = self._drawn_paths[i]
+                path = np.array(self._drawn_paths[i])
+                d[f"path[{i}].drawn_x"] = path[:,0]
+                d[f"path[{i}].drawn_y"] = path[:,1]
+                d[f"path[{i}].drawn_t"] = path[:,2]
             return d
 
         def _time_sec(self):

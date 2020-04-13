@@ -126,7 +126,8 @@ class Bspline:
             order=self._order,
             k=self._k,
             knotvector=self._knotvector,
-            controlpoints=self._control_pts
+            controlpoints_x=self._control_pts[0,:],
+            controlpoints_y=self._control_pts[1,:],
         )
 
     def boundingbox(self):
