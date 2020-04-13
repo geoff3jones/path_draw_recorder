@@ -6,21 +6,27 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from drawnpath import get_drawnpath_factory
-from drawnpath import PathsList
+from ellipse import EllipseGroup
+from bspline import BSplineGroup
+from drawing_group import newDrawingGroup
 
 #np.set_printoptions(threshold=50)
 
 # Create a black image, a window and bind the function to window
-img = np.zeros((512, 512, 3), np.uint8)
 # mouse callback function
 
 
 class PathCaptureSettings():
     def __init__(self, parsed_args):
+        """
+        this should sponge up all that spare state out of global namespace
+        """
         self._itmax  = parsed_args.itmax
         self._npaths = parsed_args.npaths
         self._paths_remaining = True
+        self._mode   = "bspline"
+        self._img    = np.zeros((512, 512, 3), np.uint8)
+        self._img_drawlayer = np.zeros((512, 512, 3), np.uint8)
 
         if parsed_args.seed is not None:
             np.random.seed(parsed_args.seed)
@@ -32,6 +38,14 @@ class PathCaptureSettings():
          self._rnd_mt_pos,
          self._rnd_mt_has_gauss,
          self._rnd_mt_gauss_cached) = np.random.get_state()
+
+    def get_img(self, layer='base'):
+        if layer=='base':
+            return self._img
+        if layer=='draw':
+            return self._img_drawlayer
+        if layer=='combined':
+            return np.maximum(self._img,self._img_drawlayer)
 
     def get_seed_state_tuple(self):
         return (self._rnd_mt_str, self._rnd_mt_keys, self._rnd_mt_pos,
@@ -58,92 +72,86 @@ class PathCaptureSettings():
                              self._rnd_mt_has_gauss,
                              self._rnd_mt_gauss_cached))
 
-    def get_next_settings(self):
+    def get_next_path_group(self):
         for i in range(self._itmax):
             for p in range(self._npaths):
                 self._reset_random(p*257)
-                yield (self._get_next_settings(), i, p)
+                yield (self._get_next_path_group(), i, p)
 
-    def _get_next_settings(self):
-        # retrieve the state position before
-        state_pos  = np.random.get_state()[2]
+    def _get_next_path_group(self):
+        if self._mode == "bspline":
+            return newDrawingGroup(BSplineGroup, cached=True)(samples_per_n=150)
+        elif self._mode == "ellipse":
+            return newDrawingGroup(EllipseGroup, cached=True)()
 
-        startAngle = np.random.rand()*360.0
-        arclength  = 60 + np.sum(np.random.rand(2))*140.0
-        direction  = np.random.choice([-1, 1])
-        settings = {'MT_STATE_POS': state_pos,
-                    'shape':        'ellipse',
-                    'centre':       np.random.randint(200, 300, (2,)).tolist(),
-                    'radii':        np.random.randint(10, 100, (2,)).tolist(),
-                    'angle':        np.random.rand()*360.0,
-                    'startAngle':   startAngle,
-                    'endAngle':     startAngle + (direction*arclength),
-                    }
-        return settings
-
-    def draw_next_shape(self, settings, i=None, p=None):
+    def draw_next_shape(self, i=None, p=None):
+        if not self._paths_remaining:
+            return None
         # zero the image
-        img[:] = 0
+        self._img[:] = 0
         if i is not None and p is not None:
-            cv2.putText(img, f"{i}/{self._itmax} {p}/{self._npaths}",
+            cv2.putText(self._img, f"{i}/{self._itmax} {p}/{self._npaths}",
                         (100, 100), cv2.FONT_HERSHEY_PLAIN,1,(255,255,255))
 
-        cv2.ellipse(img,
-                    center=tuple(settings['centre']),
-                    axes=tuple(settings['radii']),
-                    angle=settings['angle'],
-                    startAngle=settings['startAngle'],
-                    endAngle=settings['endAngle'],
-                    color=(255,255,255),
-                    thickness=2)
-        cv2.ellipse(img,
-                    center=tuple(settings['centre']),
-                    axes=tuple(settings['radii']),
-                    angle=settings['angle'],
-                    startAngle=settings['startAngle'],
-                    endAngle=settings['startAngle']+5,
-                    color=(0,255,0), # b g r
-                    thickness=2)
-        cv2.ellipse(img,
-                    center=tuple(settings['centre']),
-                    axes=tuple(settings['radii']),
-                    angle=settings['angle'],
-                    startAngle=settings['endAngle']-5,
-                    endAngle=settings['endAngle'],
-                    color=(0,0,255), # b g r
-                    thickness=2)
+        if settings['shape'] == 'ellipse':
+            self.draw_ellipse(settings)
+        # TODO DRAW OBJECT
 
 
-def get_draw_callback(path_capture_settings, pathslist):
-    factory = None
-    settings_gen = path_capture_settings.get_next_settings()
-    settings = None
-    def draw_next():
-        nonlocal settings
+def get_callbacks(path_capture_settings ):
+    
+    group_gen = path_capture_settings.get_next_path_group()
+    path_group = None
+    def new_path_group():
+        """
+        Gets a new group object and returns the co-routine that draws
+        each path highlighted iteratively
+        """
+        nonlocal path_group
         try:
-            settings = next(settings_gen)
-            path_capture_settings.draw_next_shape(*settings)
-        except StopIteration:
+            path_group = next(group_gen)
+        except StopIteration as e:
             path_capture_settings.terminate()
-        return settings
-    draw_next()
+        return path_group[0].draw_iterative_highlight_ends(path_capture_settings.get_img())
+
+    path_group_draw  = iter([])
+    def cycle_path_group():
+        """
+        cycles through the paths iteratively highlighting individual ones
+        """
+        nonlocal path_group_draw
+        path_capture_settings.get_img('base')[:] = 0
+        path_capture_settings.get_img('draw')[:] = 0
+        try:
+            iteration_info = next(path_group_draw)
+        except StopIteration as e:
+            path_group_draw = new_path_group()
+            iteration_info = cycle_path_group()
+#        cv2.putText(path_capture_settings.get_img(),
+#                   f"{i}/{self._itmax} {p}/{self._npaths} {itertion_info}",
+#                    (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
+        return iteration_info
+
+    def keyboard_callback(key):
+        if key == 32: # spacebar
+            i = cycle_path_group()
+            path_group[0].set_active_subpath(i)
+
     def draw_callback(event, x, y, flags, param):
-        nonlocal factory, settings
-        if event == cv2.EVENT_LBUTTONDOWN:
-            factory = get_drawnpath_factory(x, y, settings[0], pathslist.get_list())
-            cv2.circle(img,(x,y),4,(255,0,0))
-        if event == cv2.EVENT_LBUTTONUP:
-            # finalise the path
-            if factory is not None:
-                factory.finalise()
-            factory = None
-            # draw new target path
-            draw_next()
-        if event == cv2.EVENT_MOUSEMOVE and flags & cv2.EVENT_FLAG_LBUTTON:
-            cv2.circle(img,(x,y),4,(255,0,0))
-            if factory is not None:
-                factory(x, y)
-    return draw_callback
+        if event == cv2.EVENT_LBUTTONDOWN and path_group is not None:
+            path_capture_settings.get_img('draw')[:] = 0
+            path_group[0].reset_active_path()
+            path_group[0].append_coord(x, y)
+            cv2.circle(path_capture_settings.get_img('draw'),
+                       (x, y), 4, (255, 0, 0))
+        if event == cv2.EVENT_LBUTTONUP and path_group is not None:
+            pass
+        if event == cv2.EVENT_MOUSEMOVE and path_group is not None and flags & cv2.EVENT_FLAG_LBUTTON:
+            # draw circle and add point to path
+            path_group[0].append_coord(x, y)
+            cv2.circle(path_capture_settings.get_img('draw'),(x,y),4,(255,0,0))
+    return {'draw':draw_callback,
+            'keyboard':keyboard_callback}
 
 def parse_args():
     parser = ArgumentParser()
@@ -177,25 +185,31 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    pathslist = PathsList()
     args = parse_args()
     path_capture_settings = PathCaptureSettings(args)
 
+    callbacks = get_callbacks(path_capture_settings)
+
     cv2.namedWindow('image')
-    cv2.setMouseCallback('image', get_draw_callback(path_capture_settings, pathslist))
+    cv2.setMouseCallback('image', callbacks['draw'])
 
     while(path_capture_settings.paths_remaining):
-        cv2.imshow('image', img)
-        if cv2.waitKey(20) & 0xFF == 27:
+        cv2.imshow('image', path_capture_settings.get_img('combined'))
+        key = cv2.waitKey(20) & 0xFF
+        if key == 27:
             break
-    cv2.putText(img, "Done! Thankyou, now saving...",
-                (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255))
-    cv2.imshow('image', img)
+        callbacks['keyboard'](key)
+
+
+ #   cv2.putText(img, "Done! Thankyou, now saving...",
+ #              (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255))
+#    cv2.imshow('image', img)
 
 
     state_d = path_capture_settings.get_seed_state_tuple()
     state_df = pd.DataFrame.from_dict(state_d)
-    df = pathslist.get_dataframe()
+    df = pd.DataFrame.from_dict(newDrawingGroup(BSplineGroup,
+                                                cached=True).exportlist())
     try:
         if args.outtype == "pickle":
             df.to_pickle(f"{args.outfile}.bz2.pkl", compression="bz2")

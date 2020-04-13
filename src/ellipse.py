@@ -72,6 +72,9 @@ class EllipseGroup():
         
         self._paths = [Ellipse() for _ in range(self._n_subpaths)]
 
+    def n_subpaths(self):
+        return self._n_subpaths
+
     def to_dict(self):
         """
         export to a flat dictionary
@@ -91,7 +94,7 @@ class EllipseGroup():
         for p in self._paths:
             p.draw(img)
 
-    def draw_iterative_highlight_ends(self):
+    def draw_iterative_highlight_ends(self, img):
         """
         this should return a generator that will cycle
         """

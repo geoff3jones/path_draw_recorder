@@ -1,14 +1,16 @@
 # in progress
 
-- modularise the main thing
-- modularise elipse things
-- make stroke recorder use the bspline character generation
 
 # todo
 
+- optimise bspline drawing
+- enable config of BSpline group on the CLI
 
 # done
 
+- modularise the main thing
+- make stroke recorder use the bspline character generation
+- modularise elipse things
 - modularise bspline
 - add other template stroke shapes
     - bspline

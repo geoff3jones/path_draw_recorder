@@ -66,13 +66,13 @@ class Bspline:
                 N_ik = self._Nik(i, self._k, _t)
                 self._sample_points[:, n] += N_ik * self._control_pts[:, i-1]
 
-    def draw_sample_points(self,shift=8):
+    def draw_sample_points(self, img, shift=8):
         shift_scale = 1 << shift
         for x, y in (0.5 + (self._sample_points.T*shift_scale)).astype('int64'):
             cv2.circle(img, (x, y), 12, (255, 255, 255),
                        thickness=-1, lineType=cv2.LINE_AA, shift=shift)
 
-    def draw_endpoints(self):
+    def draw_endpoints(self, img):
         cv2.circle(img, tuple(
             self._control_pts[:, 0]), 4, (0, 255, 0), lineType=cv2.LINE_AA)
         cv2.circle(img, tuple(
@@ -89,11 +89,13 @@ class Bspline:
         if self._sample_points is None or \
             samples_per_n*self._n != self._control_pts.shape[1]:
             self.gen_sample_points(samples_per_n)
-        self.draw_sample_points()
+        self.draw_sample_points(img)
         if show_ends:
-            self.draw_endpoints()
+            self.draw_endpoints(img)
 
-    def _Nik(self, i, k, t):
+    # this function is potentially cacheable for monotonic knotvectors
+    # in this case N_ik (t) == N_ik(mod(t,k))
+    def _Nik(self, i: int, k: int, t):
         """computes the knotting function see https://www.cl.cam.ac.uk/teaching/2000/AGraphHCI/SMEG/node4.html
         eq 89"""
         if k == 1:
@@ -160,16 +162,18 @@ class BSplineGroup():
         self._chr_accent_ur = Bspline(order="quadratic",
                                       boundingbox=bb_ur,
                                       max_complexity=1)
+    def n_subpaths(self):
+        return 3
 
     def to_dict(self):
         d = {'mt_pos': self._mt_pos,
              'n_subpaths': 3}
         for k, v in self._chr_centre.to_dict().items():
-            d[f"center.{k}"] = v
+            d[f"path[0].{k}"] = v
         for k, v in self._chr_accent_ul.to_dict().items():
-            d[f"accent_ul.{k}"] = v
+            d[f"path[1].{k}"] = v
         for k,v in self._chr_accent_ur.to_dict().items():
-            d[f"accent_ur.{k}"] = v
+            d[f"path[2].{k}"] = v
         return d    
 
     def draw(self, img, highlight_ends=False):
@@ -180,15 +184,15 @@ class BSplineGroup():
         self._chr_accent_ur.draw(img, self._samples_per_n,
                              show_ends=highlight_ends)
     
-    def draw_iterative_highlight_ends(self):
-        for ends in ['centre','accent_left','accent_right']:
+    def draw_iterative_highlight_ends(self, img):
+        for i in range(self.n_subpaths()):
             self._chr_centre.draw(img, self._samples_per_n,
-                                show_ends=ends=='centre')
+                                show_ends=i==0)
             self._chr_accent_ul.draw(img, self._samples_per_n//3,
-                                    show_ends=ends=='accent_left')
+                                    show_ends=i==1)
             self._chr_accent_ur.draw(img, self._samples_per_n//3,
-                                show_ends=ends=='accent_right')
-            yield ends
+                                show_ends=i==2)
+            yield i
 
 
 
@@ -201,7 +205,7 @@ if __name__ == "__main__":
         bs_char = BSplineGroup(300)
         #bs_char.draw_bspline(img,'centre')
         print(bs_char.to_dict())
-        return bs_char.draw_iterative_highlight_ends()
+        return bs_char.draw_iterative_highlight_ends(img)
 
     char_cycle = iter([])
     def cycle_char():

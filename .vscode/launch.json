@@ -17,9 +17,9 @@
                 "--outtype",
                 "pickle",
                 "-i",
-                "1",
+                "2",
                 "-n",
-                "1"
+                "2"
             ],
             "console": "integratedTerminal"
         },
