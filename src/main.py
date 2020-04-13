@@ -124,12 +124,14 @@ def get_callbacks(path_capture_settings ):
         path_capture_settings.get_img('draw')[:] = 0
         try:
             iteration_info = next(path_group_draw)
+            cv2.putText(path_capture_settings.get_img(),
+                       f"{path_group[1]+1}/{path_capture_settings._itmax} "
+                       f"{path_group[2]+1}/{path_capture_settings._npaths} "
+                       f"{iteration_info+1}/3",
+                        (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
         except StopIteration as e:
             path_group_draw = new_path_group()
             iteration_info = cycle_path_group()
-#        cv2.putText(path_capture_settings.get_img(),
-#                   f"{i}/{self._itmax} {p}/{self._npaths} {itertion_info}",
-#                    (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
         return iteration_info
 
     def keyboard_callback(key):
