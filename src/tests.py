@@ -1,3 +1,6 @@
+"""
+Trying to diagnose as weird crash I was getting when reading from parquet 
+"""
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
