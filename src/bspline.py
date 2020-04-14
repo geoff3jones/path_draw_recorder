@@ -28,8 +28,8 @@ class Bspline:
             shape = (np.random.randint(self._k,
                                                self._k+max_complexity),)
             self._control_pts = np.stack(
-                [np.random.randint(*boundingbox[0], shape),
-                 np.random.randint(*boundingbox[1], shape)])
+                [np.random.choice(boundingbox[0][1] - boundingbox[0][0], shape) + boundingbox[0][0],
+                 np.random.choice(boundingbox[1][1] - boundingbox[1][0], shape) + boundingbox[1][0]])
 
         self._n = self._control_pts.shape[1] - 1
 
@@ -133,12 +133,14 @@ class Bspline:
     def boundingbox(self):
         if self._boundingbox_xy is None:
             # of the form [[x_min x_max][y_min y_max]]
-            self._boundingbox_xy = np.stack([np.min(self._control_pts, 1),
-                                             np.max(self._control_pts, 1)])
+            self._boundingbox_xy = np.stack([np.min(self._control_pts, axis=1),
+                                             np.max(self._control_pts, axis=1)],
+                                            axis=1)
         if self._boundingbox_aex is None:
             # of the form [[x_min x_width][y_min y_width]]
-            self._boundingbox_aex = np.stack([self._boundingbox_xy[0, :],
-                                              self._boundingbox_xy[1, :] - self._boundingbox_xy[0, :]])
+            self._boundingbox_aex = np.stack([self._boundingbox_xy[:, 0],
+                                              self._boundingbox_xy[:, 1] - self._boundingbox_xy[:, 0]],
+                                             axis=1)
 
         return (self._boundingbox_xy, self._boundingbox_aex)
 
@@ -153,9 +155,9 @@ class BSplineGroup():
                                    max_complexity=6)
         self._chr_centre.gen_sample_points(self._samples_per_n)
         _, bb = self._chr_centre.boundingbox()
-        bb_ul = [[bb[0, 0], bb[0, 0]+bb[1, 0]//2],
+        bb_ul = [[bb[0, 0], bb[0, 0] + max(bb[1, 0]//2,50)],
                  [bb[0, 1], bb[0, 1]+100]]
-        bb_ur = [[bb[0, 0]+bb[1, 0]//2, bb[0, 0] + bb[1, 0]],
+        bb_ur = [[bb[0, 0]+bb[1, 0]//2, bb[0, 0] + max(bb[1, 0],50)],
                  [bb[0, 1], bb[0, 1]+100]]
         self._chr_accent_ul = Bspline(order="quadratic",
                                       boundingbox=bb_ul,

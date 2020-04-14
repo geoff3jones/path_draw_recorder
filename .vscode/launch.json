@@ -17,9 +17,9 @@
                 "--outtype",
                 "parquet",
                 "-i",
-                "2",
+                "1",
                 "-n",
-                "2"
+                "50"
             ],
             "console": "integratedTerminal"
         },

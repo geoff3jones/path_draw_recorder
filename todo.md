@@ -8,6 +8,7 @@
 
 # done
 
+- de-bug some of the bspline drawing where all the paths gather in the top left hand corner
 - modularise the main thing
 - make stroke recorder use the bspline character generation
 - modularise elipse things

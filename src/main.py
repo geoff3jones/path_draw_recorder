@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+import argparse
 import uuid 
 import sys
 
@@ -15,6 +15,7 @@ from drawing_group import newDrawingGroup
 # Create a black image, a window and bind the function to window
 # mouse callback function
 
+DBG_LVL = 0
 
 class PathCaptureSettings():
     def __init__(self, parsed_args):
@@ -76,6 +77,8 @@ class PathCaptureSettings():
         for i in range(self._itmax):
             for p in range(self._npaths):
                 self._reset_random(p*257)
+                if DBG_LVL > 0:
+                    print(f"dgb: current mt_pos {self._rnd_mt_pos + (p*257)}")
                 yield (self._get_next_path_group(), i, p)
 
     def _get_next_path_group(self):
@@ -83,19 +86,6 @@ class PathCaptureSettings():
             return newDrawingGroup(BSplineGroup, cached=True)(samples_per_n=150)
         elif self._mode == "ellipse":
             return newDrawingGroup(EllipseGroup, cached=True)()
-
-    def draw_next_shape(self, i=None, p=None):
-        if not self._paths_remaining:
-            return None
-        # zero the image
-        self._img[:] = 0
-        if i is not None and p is not None:
-            cv2.putText(self._img, f"{i}/{self._itmax} {p}/{self._npaths}",
-                        (100, 100), cv2.FONT_HERSHEY_PLAIN,1,(255,255,255))
-
-        if settings['shape'] == 'ellipse':
-            self.draw_ellipse(settings)
-        # TODO DRAW OBJECT
 
 
 def get_callbacks(path_capture_settings ):
@@ -156,7 +146,9 @@ def get_callbacks(path_capture_settings ):
             'keyboard':keyboard_callback}
 
 def parse_args():
-    parser = ArgumentParser()
+    global DBG_LVL
+
+    parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--outfile", dest="outfile", required=True,  # type=String,
                         help="output file name [less extension] to save the"
                         " results data frame to")
@@ -174,6 +166,8 @@ def parse_args():
                         help="the number of paths to record")
     parser.add_argument("-i", "--itmax", dest="itmax", type=int, default=5,
                         help="the number times to record each path")
+    parser.add_argument( "--_dbg_level", dest="DBG_LVL", type=int, default=0,
+                        help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     if args.seedfile is not None:
@@ -182,6 +176,8 @@ def parse_args():
         args.seed_state = tuple(v for v in state.to_dict()[0].values())
     else:
         args.seed_state = None
+
+    DBG_LVL = args.DBG_LVL
 
     return args
 
