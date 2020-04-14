@@ -41,7 +41,7 @@ root_path = os.path.dirname( os.path.realpath(__file__))
 main_file = os.path.join(root_path, 'src', 'main.py')
 out_file  = os.path.join(root_path, 'standard_set')
 command = [sys.executable, main_file, "--seed", "1000000", "--outfile",
-           out_file, "--outtype", "parquet", "-i", "5", "-n", "50", '--_dbg_level', '1']
+           out_file, "--outtype", "parquet", "-i", "5", "-n", "50"]
 print("running:\n",' '.join(command))
 subprocess.run(command)
 print("Gosh Thanks!!")
