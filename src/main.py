@@ -76,14 +76,14 @@ class PathCaptureSettings():
     def get_next_path_group(self):
         for i in range(self._itmax):
             for p in range(self._npaths):
-                self._reset_random(p*257)
+                self._reset_random(p*64)
                 if DBG_LVL > 0:
                     print(f"dgb: current mt_pos {self._rnd_mt_pos + (p*257)}")
                 yield (self._get_next_path_group(), i, p)
 
     def _get_next_path_group(self):
         if self._mode == "bspline":
-            return newDrawingGroup(BSplineGroup, cached=True)(samples_per_n=150)
+            return newDrawingGroup(BSplineGroup, cached=True)(samples_per_n=50)
         elif self._mode == "ellipse":
             return newDrawingGroup(EllipseGroup, cached=True)()
 
@@ -118,7 +118,7 @@ def get_callbacks(path_capture_settings ):
                        f"{path_group[1]+1}/{path_capture_settings._itmax} "
                        f"{path_group[2]+1}/{path_capture_settings._npaths} "
                        f"{iteration_info+1}/3",
-                        (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
+                        (50, 50), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
         except StopIteration as e:
             path_group_draw = new_path_group()
             iteration_info = cycle_path_group()

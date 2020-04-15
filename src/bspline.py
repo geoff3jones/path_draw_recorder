@@ -28,8 +28,8 @@ class Bspline:
             shape = (np.random.randint(self._k,
                                                self._k+max_complexity),)
             self._control_pts = np.stack(
-                [np.random.choice(boundingbox[0][1] - boundingbox[0][0], shape) + boundingbox[0][0],
-                 np.random.choice(boundingbox[1][1] - boundingbox[1][0], shape) + boundingbox[1][0]])
+                [np.random.choice(boundingbox[0][1] - boundingbox[0][0], size=shape, replace=False) + boundingbox[0][0],
+                 np.random.choice(boundingbox[1][1] - boundingbox[1][0], size=shape, replace=False) + boundingbox[1][0]])
 
         self._n = self._control_pts.shape[1] - 1
 
@@ -60,17 +60,67 @@ class Bspline:
                         stop=self._knotvector[-(self._k)],
                         num=samples_per_n*self._n, endpoint=False)
 
-        self._sample_points = np.zeros((self._control_pts.shape[0], len(t)))
+        self._sample_points = np.zeros((self._control_pts.shape[0], len(t) + 1))
         for n, _t in enumerate(t):
             for i in range(1, self._n + 2):
                 N_ik = self._Nik(i, self._k, _t)
                 self._sample_points[:, n] += N_ik * self._control_pts[:, i-1]
 
-    def draw_sample_points(self, img, shift=8):
+        self._sample_points[:, -1] = self._control_pts[:, -1]
+
+    def draw_sample_points(self, img, shift=16, AA=True):
         shift_scale = 1 << shift
-        for x, y in (0.5 + (self._sample_points.T*shift_scale)).astype('int64'):
-            cv2.circle(img, (x, y), 12, (255, 255, 255),
-                       thickness=-1, lineType=cv2.LINE_AA, shift=shift)
+        #s(img, pts, isClosed, color[, thickness[, lineType[, shift]]]) 
+        def drawoffset(x):
+            return cv2.polylines(img.copy(),
+                          np.int32([x + (self._sample_points.T * shift_scale)]),
+                          isClosed=False, color=(255, 255, 255),
+                          lineType=cv2.LINE_AA, shift=shift, thickness=1
+                         )
+
+        if not AA:
+            img[:] = drawoffset(np.array([[0, 0]]))
+        else:
+            # uses a 3x3 approximation to gaussian 
+            # 1/12 | 1/6 | 1/12
+            # 1/6  | 1/3 | 1/6
+            # 1/12 | 1/6 | 1/12
+            offset = 0 # 4 * shift_scale // 5
+            i_w4_1 = drawoffset(np.array([[0, 0]]))
+
+            i_w2_1 = drawoffset(np.array([[ offset, 0]]))
+            i_w2_2 = drawoffset(np.array([[-offset, 0]]))
+            i_w2_3 = drawoffset(np.array([[0, offset]]))
+            i_w2_4 = drawoffset(np.array([[0, -offset]]))
+
+            i_w1_1 = drawoffset(np.array([[ offset, offset]]))
+            i_w1_2 = drawoffset(np.array([[-offset, offset]]))
+            i_w1_3 = drawoffset(np.array([[ offset,-offset]]))
+            i_w1_4 = drawoffset(np.array([[-offset,-offset]]))
+
+            def add(a, b):
+                return cv2.addWeighted(a, 0.5, b, 0.5, gamma=0)            
+
+            img[:] = add(
+                        add(i_w4_1,
+                            add(
+                                add(i_w1_1,
+                                    i_w1_2),
+                                add(i_w1_3,
+                                    i_w1_4)
+                                )
+                            ),
+                        add(
+                            add(i_w2_1,
+                                i_w2_2),
+                            add(i_w2_3,
+                                i_w2_4)
+                            )
+                        )
+
+        #for x, y in (0.5 + (self._sample_points.T*shift_scale)).astype('int64'):
+        #    cv2.circle(img, (x, y), 12, (255, 255, 255),
+        #               thickness=-1, lineType=cv2.LINE_AA, shift=shift)
 
     def draw_endpoints(self, img):
         cv2.circle(img, tuple(
@@ -152,13 +202,16 @@ class BSplineGroup():
 
         self._chr_centre = Bspline(order="cubic",
                                    boundingbox=[[100, 400], [100, 400]],
-                                   max_complexity=6)
+                                   max_complexity=5)
         self._chr_centre.gen_sample_points(self._samples_per_n)
+        # second term is anchor and extent [[x ex][y ey]]
         _, bb = self._chr_centre.boundingbox()
-        bb_ul = [[bb[0, 0], bb[0, 0] + max(bb[1, 0]//2,50)],
-                 [bb[0, 1], bb[0, 1]+100]]
-        bb_ur = [[bb[0, 0]+bb[1, 0]//2, bb[0, 0] + max(bb[1, 0],50)],
-                 [bb[0, 1], bb[0, 1]+100]]
+        # position slightly above and to the left
+        bb_ul = [[bb[0, 0] - 50, bb[0, 0] + max(bb[0, 1] // 2, 100)],
+                 [bb[1, 0] - 50, bb[1, 0] + 100]]
+        # position slightly above and to the right
+        bb_ur = [[bb[0, 0] + bb[0, 1] // 2, bb[0, 0] + max(bb[0, 1] // 2, 100) + 50],
+                 [bb[1, 0] - 50, bb[1, 0] + 100]]
         self._chr_accent_ul = Bspline(order="quadratic",
                                       boundingbox=bb_ul,
                                       max_complexity=1)
