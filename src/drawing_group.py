@@ -1,6 +1,7 @@
 import time
 import functools
 import numpy as np
+from hashlib import md5
 
 def newDrawingGroup(GroupType,cached=False):
     """
@@ -46,7 +47,9 @@ def _newDrawingGroup_uncached(GroupType):
                 d[f"path[{i}].drawn_x"] = path[:,0]
                 d[f"path[{i}].drawn_y"] = path[:,1]
                 d[f"path[{i}].drawn_t"] = path[:,2]
-            return {**super(DrawingGroup, self).to_dict(),**d}
+            return {'state_hash': md5(self._rnd_state),
+                    **super(DrawingGroup, self).to_dict(),
+                    **d}
 
         def _time_sec(self):
             return time.time_ns() / (10**9)
