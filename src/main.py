@@ -1,6 +1,7 @@
 import argparse
 import uuid 
 import sys
+import hashlib
 
 import cv2
 import numpy as np
@@ -76,10 +77,15 @@ class PathCaptureSettings():
     def get_next_path_group(self):
         for i in range(self._itmax):
             for p in range(self._npaths):
-                self._reset_random(p*64)
+                # self._reset_random(p*64)
                 if DBG_LVL > 0:
-                    print(f"dgb: current mt_pos {self._rnd_mt_pos + (p*257)}")
-                yield (self._get_next_path_group(), i, p)
+                    print(f"np.MT: key# {hashlib.md5(np.random.get_state()[1]).hexdigest()} | pos {np.random.get_state()[2]}")
+                pathgroup = self._get_next_path_group()
+                #if DBG_LVL > 1:
+                #    pass
+                #    print(f"key state difference: "
+                #          f"{sum(self._rnd_mt_keys == np.random.get_state()[1])}")
+                yield (pathgroup, i, p)
 
     def _get_next_path_group(self):
         if self._mode == "bspline":
@@ -118,7 +124,7 @@ def get_callbacks(path_capture_settings ):
                        f"{path_group[1]+1}/{path_capture_settings._itmax} "
                        f"{path_group[2]+1}/{path_capture_settings._npaths} "
                        f"{iteration_info+1}/3",
-                        (50, 50), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
+                        (50, 450), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
         except StopIteration as e:
             path_group_draw = new_path_group()
             iteration_info = cycle_path_group()

@@ -3,11 +3,11 @@
 
 # todo
 
-- optimise bspline drawing
 - enable config of BSpline group on the CLI
 
 # done
 
+- optimise bspline drawing - sample at a lower level and draw as a line
 - de-bug some of the bspline drawing where all the paths gather in the top left hand corner
 - modularise the main thing
 - make stroke recorder use the bspline character generation

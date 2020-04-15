@@ -8,9 +8,6 @@ class Ellipse():
         """
         A partial ellipse
         """
-        # this must happen before anyother calls to random are made
-        self._mt_pos = np.random.get_state()[3]
-
         startAngle = np.random.rand()*360.0
         arclength = 60 + np.sum(np.random.rand(2))*140.0
         direction = np.random.choice([-1, 1])
@@ -49,8 +46,7 @@ class Ellipse():
                         thickness=2)
         
     def to_dict(self):
-        return {'mt_pos':          self._mt_pos,
-                'shape':           'ellipse',
+        return {'shape':           'ellipse',
                 'centre_x':        self._centre[0],
                 'centre_y':        self._centre[1],
                 'radii_primary':   self._radii[0],
@@ -68,7 +64,6 @@ class EllipseGroup():
         """
         self._n_subpaths = n_subpaths
         # this must happen before anyother calls to random are made
-        self._mt_pos = np.random.get_state()[3]
         
         self._paths = [Ellipse() for _ in range(self._n_subpaths)]
 
@@ -79,8 +74,7 @@ class EllipseGroup():
         """
         export to a flat dictionary
         """
-        settings = {'mt_pos': self._mt_pos,
-                    'n_subpaths': len(self._paths)}
+        settings = {'n_subpaths': len(self._paths)}
         for i,p in enumerate(self._paths):
             for k, v in p.to_dict().items():
                 settings[f"path[{i}].{k}"] = v

@@ -9,8 +9,6 @@ class Bspline:
 
     def __init__(self, control_points=None, order="quadratic", knotvector=None,
                  boundingbox=None, max_complexity=None):
-        self._mt_pos = np.random.get_state()[2]
-
         self._order = order
         if self._order == "linear":
             self._k = 2
@@ -21,15 +19,19 @@ class Bspline:
 
         if control_points is None:
             if boundingbox is None:
-                boundingbox = [[10, 490], [10, 250]]
+                boundingbox = np.array([[10, 490], [10, 250]])
             if max_complexity is None:
                 max_complexity = 5
+            
+            boundingbox = np.array(boundingbox)
             # gen = np.random.default_rng()
-            shape = (np.random.randint(self._k,
-                                               self._k+max_complexity),)
-            self._control_pts = np.stack(
-                [np.random.choice(boundingbox[0][1] - boundingbox[0][0], size=shape, replace=False) + boundingbox[0][0],
-                 np.random.choice(boundingbox[1][1] - boundingbox[1][0], size=shape, replace=False) + boundingbox[1][0]])
+            shape = (np.random.randint(self._k, self._k+max_complexity),2)
+            sampled_points = np.random.random(shape)
+            # map to full range
+            sampled_points /= np.max(sampled_points)
+            # map sampled points to the range
+            self._control_pts = np.int32((sampled_points * (boundingbox[:,1]-boundingbox[:,0])) 
+                                    + np.array([[boundingbox[0,0],boundingbox[1,0]]])).T
 
         self._n = self._control_pts.shape[1] - 1
 
@@ -171,7 +173,6 @@ class Bspline:
 
     def to_dict(self):
         return dict(
-            mt_pos=self._mt_pos,
             shape='bspline',
             order=self._order,
             k=self._k,
@@ -197,12 +198,13 @@ class Bspline:
 class BSplineGroup():
 
     def __init__(self, samples_per_n):
-        self._mt_pos = np.random.get_state()[2]
         self._samples_per_n = samples_per_n
 
         self._chr_centre = Bspline(order="cubic",
-                                   boundingbox=[[100, 400], [100, 400]],
-                                   max_complexity=5)
+                                   boundingbox=np.array([[100, 400],
+                                                         [100, 400]]),
+                                   max_complexity=5,
+                                   )
         self._chr_centre.gen_sample_points(self._samples_per_n)
         # second term is anchor and extent [[x ex][y ey]]
         _, bb = self._chr_centre.boundingbox()
@@ -214,23 +216,21 @@ class BSplineGroup():
                  [bb[1, 0] - 50, bb[1, 0] + 100]]
         self._chr_accent_ul = Bspline(order="quadratic",
                                       boundingbox=bb_ul,
-                                      max_complexity=1)
+                                      max_complexity=1,
+                                      )
         self._chr_accent_ur = Bspline(order="quadratic",
                                       boundingbox=bb_ur,
-                                      max_complexity=1)
+                                      max_complexity=1,
+                                      )
     def n_subpaths(self):
         return 3
 
     def to_dict(self):
-        d = {'mt_pos': self._mt_pos,
-             'n_subpaths': 3}
-        for k, v in self._chr_centre.to_dict().items():
-            d[f"path[0].{k}"] = v
-        for k, v in self._chr_accent_ul.to_dict().items():
-            d[f"path[1].{k}"] = v
-        for k,v in self._chr_accent_ur.to_dict().items():
-            d[f"path[2].{k}"] = v
-        return d    
+        d  = {'n_subpaths': 3}
+        p0 = {d[f"path[0]": v for k, v in self._chr_centre.to_dict().items()}
+        p2 = {d[f"path[1]": v for k, v in self._chr_accent_ul.to_dict().items()}
+        p2 = {d[f"path[2]": v for k, v in self._chr_accent_ur.to_dict().items()}
+        return {**d, **p0, **p1, **p2} 
 
     def draw(self, img, highlight_ends=False):
         self._chr_centre.draw(img, self._samples_per_n,

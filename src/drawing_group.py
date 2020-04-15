@@ -28,6 +28,7 @@ def _newDrawingGroup_uncached(GroupType):
             DrawingGroup._pathslist = []
 
         def __init__(self, *args, **kwargs):
+            self._rnd_state = np.random.get_state()
             super(DrawingGroup, self).__init__(*args, **kwargs)
             self._drawn_paths = tuple(list() for _ in range(super(DrawingGroup,self).n_subpaths()))
             self._active_subpath = 0
@@ -35,13 +36,17 @@ def _newDrawingGroup_uncached(GroupType):
             DrawingGroup._pathslist.append(self)
 
         def to_dict(self):
-            d = super(DrawingGroup, self).to_dict()
+            d = {k: v for k, v in zip(['rnd_engine',
+                                       'rnd_keys',
+                                       'rnd_pos',
+                                       'has_gauss',
+                                       'cached_gauss'], self._rnd_state)}
             for i, p in enumerate(self._drawn_paths):
                 path = np.array(self._drawn_paths[i])
                 d[f"path[{i}].drawn_x"] = path[:,0]
                 d[f"path[{i}].drawn_y"] = path[:,1]
                 d[f"path[{i}].drawn_t"] = path[:,2]
-            return d
+            return {**super(DrawingGroup, self).to_dict(),**d}
 
         def _time_sec(self):
             return time.time_ns() / (10**9)

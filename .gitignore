@@ -4,6 +4,7 @@ env64
 env_min
 output
 .temp.*
+.*.py
 *.parquet
 *.bz2.pkl
 *.pkl

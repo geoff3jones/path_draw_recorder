@@ -3,6 +3,8 @@ import sys
 import subprocess
 import os
 
+# Check python version
+
 if sys.version_info[0] < 3:
     print("OOPS: This script requires python version 3 try running it with a newer version.")
     sys.exit()
@@ -10,7 +12,8 @@ if sys.version_info[1] < 7:
     print(
     """WARNING: This script was only tested using python 3.8.x and may function
          incorrectly on earlier python versions.""")
-    # sys.exit()
+
+# Warn user that this may take a while
 
 msg = \
 """This will run the capture app and then save a file in this directory.
@@ -22,7 +25,19 @@ if re.match(r'[yY][eE][sS]|[yY]', response) is None:
     print("no worries, maybe later then?")
     sys.exit()
 
-print("Awesome!")
+print("Fab!")
+
+# configure the command to run
+root_path = os.path.dirname( os.path.realpath(__file__))
+main_file = os.path.join(root_path, 'src', 'main.py')
+out_file  = os.path.join(root_path, 'standard_set')
+command = [sys.executable, main_file, "--seed", "20200318", "--outfile",
+           out_file, "--outtype", "parquet", "-i", "5", "-n", "50"]
+
+response = input('Would you run in debug mode? [y/N]')
+if re.match(r'[yY][eE][sS]|[yY]', response) is not None:
+    command += ["--_dbg_level","2"]
+
 msg = \
 """...
 Right ok here's how it works:
@@ -35,13 +50,8 @@ Right ok here's how it works:
     - Clicking the X in the top right hand corner does nothing, use Esc to quit.
 """
 print(msg)
-input('continue...')
+input("press enter to continue...")
 
-root_path = os.path.dirname( os.path.realpath(__file__))
-main_file = os.path.join(root_path, 'src', 'main.py')
-out_file  = os.path.join(root_path, 'standard_set')
-command = [sys.executable, main_file, "--seed", "1000000", "--outfile",
-           out_file, "--outtype", "parquet", "-i", "5", "-n", "50"]
 print("running:\n",' '.join(command))
 subprocess.run(command)
 print("Gosh Thanks!!")
