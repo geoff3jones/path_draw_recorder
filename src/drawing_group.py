@@ -47,7 +47,7 @@ def _newDrawingGroup_uncached(GroupType):
                 d[f"path[{i}].drawn_x"] = path[:,0]
                 d[f"path[{i}].drawn_y"] = path[:,1]
                 d[f"path[{i}].drawn_t"] = path[:,2]
-            return {'state_hash': md5(self._rnd_state),
+            return {'state_hash': md5(self._rnd_state).hexdigest(),
                     **super(DrawingGroup, self).to_dict(),
                     **d}
 
