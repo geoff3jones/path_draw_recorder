@@ -43,13 +43,21 @@ def _newDrawingGroup_uncached(GroupType):
                                        'has_gauss',
                                        'cached_gauss'], self._rnd_state)}
             for i, p in enumerate(self._drawn_paths):
-                path = np.array(self._drawn_paths[i])
-                d[f"path[{i}].drawn_x"] = path[:,0]
-                d[f"path[{i}].drawn_y"] = path[:,1]
-                d[f"path[{i}].drawn_t"] = path[:,2]
-            return {'state_hash': md5(self._rnd_state).hexdigest(),
+                if p == []:
+                    d[f"path[{i}].drawn_x"] = None
+                    d[f"path[{i}].drawn_y"] = None
+                    d[f"path[{i}].drawn_t"] = None
+                else:
+                    path = np.array(p)
+                    d[f"path[{i}].drawn_x"] = path[:,0]
+                    d[f"path[{i}].drawn_y"] = path[:,1]
+                    d[f"path[{i}].drawn_t"] = path[:,2]
+            return {'state_hash': md5(np.append(self._rnd_state[1],
+                                                self._rnd_state[2:])
+                                      ).hexdigest(),
                     **super(DrawingGroup, self).to_dict(),
-                    **d}
+                    **d
+                    }
 
         def _time_sec(self):
             return time.time_ns() / (10**9)

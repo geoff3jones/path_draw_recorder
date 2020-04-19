@@ -1,7 +1,9 @@
 import argparse
 import uuid 
 import sys
+import os
 import hashlib
+import re
 
 import cv2
 import numpy as np
@@ -19,21 +21,25 @@ from drawing_group import newDrawingGroup
 DBG_LVL = 0
 
 class PathCaptureSettings():
-    def __init__(self, parsed_args):
+    def __init__(self, settings):
         """
         this should sponge up all that spare state out of global namespace
         """
-        self._itmax  = parsed_args.itmax
-        self._npaths = parsed_args.npaths
+        self._itmax = settings.itmax
+        self._npaths = settings.npaths
+        self._current_iteration = 0 if settings.current_iter is None \
+                                    else settings.current_iter
+        self._current_path = 0 if settings.current_path is None \
+                               else settings.current_path
         self._paths_remaining = True
-        self._mode   = "bspline"
-        self._img    = np.zeros((512, 512, 3), np.uint8)
+        self._mode = "bspline"
+        self._img = np.zeros((512, 512, 3), np.uint8)
         self._img_drawlayer = np.zeros((512, 512, 3), np.uint8)
 
-        if parsed_args.seed is not None:
-            np.random.seed(parsed_args.seed)
-        if parsed_args.seed_state is not None:
-            np.random.set_state(parsed_args.seed_state)
+        if settings.seed_state is not None:
+            np.random.set_state(settings.seed_state)
+        elif settings.seed is not None:
+            np.random.seed(settings.seed)
         # store the MT19937 initial sate
         (self._rnd_mt_str,
          self._rnd_mt_keys,
@@ -49,16 +55,20 @@ class PathCaptureSettings():
         if layer=='combined':
             return np.maximum(self._img,self._img_drawlayer)
 
+
+    def to_dict(self):
+        return {
+                "iterations":   self._itmax,
+                "n_paths":      self._npaths,
+                "current_iter": self._current_iteration,
+                "current_path": self._current_path,
+                "rnd_state":    self.get_seed_state_tuple(),
+                }
+
+
     def get_seed_state_tuple(self):
         return (self._rnd_mt_str, self._rnd_mt_keys, self._rnd_mt_pos,
                 self._rnd_mt_has_gauss, self._rnd_mt_gauss_cached)
-
-    def get_seed_state_dict(self):
-        return {"ENGINE":       self._rnd_mt_str,
-                "KEYS":         self._rnd_mt_keys,
-                "POS":          self._rnd_mt_pos,
-                "HAS_GAUSS":    self._rnd_mt_has_gauss,
-                "CACHED_GAUSS": self._rnd_mt_gauss_cached}
 
     @property
     def paths_remaining(self):
@@ -75,17 +85,28 @@ class PathCaptureSettings():
                              self._rnd_mt_gauss_cached))
 
     def get_next_path_group(self):
-        for i in range(self._itmax):
-            for p in range(self._npaths):
-                # self._reset_random(p*64)
+        """
+        get the next path group.
+        this will fast forward to the current path and iteration, generating
+        all the same random states along the way
+        """
+        for i in range(self._current_iteration, self._itmax):
+            if self._current_iteration < i:
+                self._current_iteration = i
+            self._reset_random()
+            for p in range(self._current_path, self._npaths):
+                if self._current_iteration == i and self._current_path < p:
+                    self._current_path = p
                 if DBG_LVL > 0:
                     print(f"np.MT: key# {hashlib.md5(np.random.get_state()[1]).hexdigest()} | pos {np.random.get_state()[2]}")
                 pathgroup = self._get_next_path_group()
-                #if DBG_LVL > 1:
-                #    pass
-                #    print(f"key state difference: "
-                #          f"{sum(self._rnd_mt_keys == np.random.get_state()[1])}")
-                yield (pathgroup, i, p)
+                if self._current_iteration == i and self._current_path == p:
+                    yield (pathgroup, i, p)
+            if self._current_iteration == i:
+                self._current_path = 0
+
+        self._current_iteration = None
+        self._current_path = None
 
     def _get_next_path_group(self):
         if self._mode == "bspline":
@@ -151,6 +172,60 @@ def get_callbacks(path_capture_settings ):
     return {'draw':draw_callback,
             'keyboard':keyboard_callback}
 
+class FileIOHelper():
+    def __init__(self, arg_settings):
+        self._data_file_root = os.path.abspath(arg_settings.outfile)
+        self._temp_file_root = os.path.abspath(f".temp.{uuid.uuid4().hex}")
+        self._data_file_ok   = True
+        self._out_type       = arg_settings.outtype
+
+        if arg_settings.outtype == "pickle":
+            self._writer = pd.DataFrame.to_pickle
+            self._writer_args = dict(compression="bz2")
+            self._reader = pd.read_pickle
+            self._reader_args = dict(compression="bz2")
+            self._file_ext = ".bz2.pkl"
+        elif arg_settings.outtype == "parquet":
+            self._writer = pd.DataFrame.to_parquet
+            self._writer_args = dict()
+            self._reader = pd.read_parquet
+            self._reader_args = dict()
+            self._file_ext = ".parquet"
+        elif arg_settings.outtype == "csv":
+            self._writer = pd.DataFrame.to_csv
+            self._writer_args = dict()
+            self._reader = pd.read_csv
+            self._reader_args = dict()
+            self._file_ext = ".csv"
+        
+    def _get_file_root(self):
+        return self._data_file_root if self._data_file_ok else self._temp_file_root
+
+    @property
+    def settings_filename(self):
+        return f"{self._get_file_root()}.settings.pkl"
+
+    @property
+    def data_filename(self):
+        return f"{self._get_file_root()}{self._file_ext}"
+
+    def read(self, target="settings"):
+        if target == "settings":
+            return pd.read_pickle(self.settings_filename)
+        elif target == "data":
+            return self._reader(self.data_filename, **self._reader_args)
+        raise ValueError("unknown target type")
+
+    def write(self, data_frame):
+        try:
+            self._writer(data_frame, self.data_filename, **self._writer_args)
+        except FileNotFoundError:
+            self._data_file_ok = False
+            print( "The target output file could not be written to; output will try to be written to:\n"
+                  f"{os.path.abspath(self.data_filename)}")
+            self._writer(data_frame, self.data_filename, **self._writer_args)
+
+
 def parse_args():
     global DBG_LVL
 
@@ -164,88 +239,87 @@ def parse_args():
     parser.add_argument("-s", "--seed", dest="seed", type=int, default=None,
                         help="set a seed value for the random shape generator for repeatability",
                         )
-    parser.add_argument("-S", "--seedfile", dest="seedfile", default=None,
-                        help="set a seed state from pickle file this would have"
-                        " been created in a previous run",
-                        )
+    parser.add_argument("-S", "--settingsfile", dest="settingsfile", default=None,
+                        help="load settings from file this would have been "
+                        "created in a previous run")
     parser.add_argument("-n", "--npaths", dest="npaths", type=int, default=25,
                         help="the number of paths to record")
     parser.add_argument("-i", "--itmax", dest="itmax", type=int, default=5,
                         help="the number times to record each path")
     parser.add_argument( "--_dbg_level", dest="DBG_LVL", type=int, default=0,
                         help=argparse.SUPPRESS)
+    parser.add_argument( "--start_iter", dest="current_iter", type=int, default=None,
+                        help=argparse.SUPPRESS)
+    parser.add_argument( "--start_path", dest="current_path", type=int, default=None,
+                        help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    if args.seedfile is not None:
-        print("loading pickled seed state")
-        state = pd.read_pickle(args.seedfile)
-        args.seed_state = tuple(v for v in state.to_dict()[0].values())
+    io_helper = FileIOHelper(args)
+
+    # run is a continutation from previous and should be appended to the same file 
+    args.continuation = False
+    # check for existing settings file
+    if args.settingsfile is None and os.path.exists(io_helper.settings_filename):
+        msg = "Matching settings file found\n" \
+              "Would you like to load these settings? [Y/n]"
+        loadsettings = input(msg)
+        if re.match(r'[nN][oO]|[nN]', loadsettings) is None:
+            args.settingsfile = io_helper.settings_filename
+
+    if args.settingsfile is not None:
+        print("loading pickled settings file")
+        state = pd.read_pickle(args.settingsfile)
+        args.seed_state = state.rnd_state[0]
+        if state.current_iter[0] is not None or state.current_path[0] is not None \
+            and os.path.exists(io_helper.data_filename):
+            msg = "It looks like you were half way through this, shall we pick up were you left of? [Y/n]"
+            load_last_position = input(msg)
+        if re.match(r'[nN][oO]|[nN]', load_last_position ) is None:
+            args.continuation = True
+            args.current_path = state.current_path[0]
+            args.current_iter = state.current_iter[0]
+            args.itmax  = state.iterations[0]
+            args.npaths = state.n_paths[0]
+
     else:
         args.seed_state = None
 
     DBG_LVL = args.DBG_LVL
 
-    return args
+    return args, io_helper
 
-if __name__ == "__main__":
-
-    args = parse_args()
+def main():
+    args, io_helper = parse_args()
     path_capture_settings = PathCaptureSettings(args)
+    cv2.putText(path_capture_settings.get_img(),
+                "press [space] to begin", (160, 250),
+                cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
 
-    callbacks = get_callbacks(path_capture_settings)
+    call_backs = get_callbacks(path_capture_settings)
 
     cv2.namedWindow('image')
-    cv2.setMouseCallback('image', callbacks['draw'])
+    cv2.setMouseCallback('image', call_backs['draw'])
 
     while(path_capture_settings.paths_remaining):
         cv2.imshow('image', path_capture_settings.get_img('combined'))
         key = cv2.waitKey(20) & 0xFF
         if key == 27:
             break
-        callbacks['keyboard'](key)
+        call_backs['keyboard'](key)
 
-
- #   cv2.putText(img, "Done! Thankyou, now saving...",
- #              (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255))
-#    cv2.imshow('image', img)
-
-
-    state_d = path_capture_settings.get_seed_state_tuple()
-    state_df = pd.DataFrame.from_dict(state_d)
-    df = pd.DataFrame.from_dict(newDrawingGroup(BSplineGroup,
+    state_d = path_capture_settings.to_dict()
+    state_df = pd.DataFrame.from_dict([state_d])
+    out_df = pd.DataFrame.from_dict(newDrawingGroup(BSplineGroup,
                                                 cached=True).exportlist())
-    try:
-        if args.outtype == "pickle":
-            df.to_pickle(f"{args.outfile}.bz2.pkl", compression="bz2")
-        elif args.outtype == "parquet":
-            df.to_parquet(f"{args.outfile}.parquet")
-        elif args.outtype == "csv":
-            df.to_csv(f"{args.outfile}.csv")
-        else:
-            print("unknown export file type")
-        # save rndm state
-        state_df.to_pickle(f"{args.outfile}.seedstate.pkl")
 
-    except FileNotFoundError:
-        outfile = f".temp.{uuid.uuid4().hex}"
-        if args.outtype == "pickle":
-            outfile = f"{outfile}.bz2.pkl"
-            df.to_pickle(outfile, compression="bz2")
-        elif args.outtype == "parquet":
-            outfile = f"{outfile}.parquet"
-            df.to_parquet(outfile)
-        elif args.outtype == "csv":
-            outfile = f"{outfile}.csv"
-            df.to_csv(outfile)
-        # save rndm state
-        state_df.to_pickle(f"{outfile}.seedstate.pkl")
+    if args.continuation:
+        old_df = io_helper.read("data")
+        out_df = pd.concat([old_df, out_df]).dropna()
 
-        print(f"""couldn't write to the path:
-        \"{args.outfile}\"
-        instead writing to th temporary file
-        {outfile}""")
-    
-    
-
+    io_helper.write(out_df)
+    state_df.to_pickle(io_helper.settings_filename)
 
     cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()

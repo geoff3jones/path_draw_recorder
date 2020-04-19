@@ -10,16 +10,13 @@
             "request": "launch",
             "program": "${workspaceFolder}\\src\\main.py",
             "args": [
-                "--seed",
-                "1000000",
-                "--outfile",
-                "output\\test",
-                "--outtype",
-                "parquet",
-                "-i",
-                "1",
-                "-n",
-                "50"
+                "--seed", "20052017",
+                "--outfile", "output\\test",
+                "--outtype", "parquet",
+                "-i", "2",
+                "-n", "2",
+                /*"--start_iter", "1",
+                "--start_path", "1",*/
             ],
             "console": "integratedTerminal"
         },
