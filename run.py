@@ -31,7 +31,7 @@ print("Fab!")
 root_path = os.path.dirname( os.path.realpath(__file__))
 main_file = os.path.join(root_path, 'src', 'main.py')
 out_file  = os.path.join(root_path, 'standard_set')
-command = [sys.executable, main_file, "--seed", "20200318", "--outfile",
+command = [sys.executable, main_file, "--seed", "20052017", "--outfile",
            out_file, "--outtype", "parquet", "-i", "5", "-n", "50"]
 
 response = input('Would you run in debug mode? [y/N]')
