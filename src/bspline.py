@@ -227,9 +227,9 @@ class BSplineGroup():
 
     def to_dict(self):
         d  = {'n_subpaths': 3}
-        p0 = {f"path[0]": v for k, v in self._chr_centre.to_dict().items()}
-        p2 = {f"path[1]": v for k, v in self._chr_accent_ul.to_dict().items()}
-        p2 = {f"path[2]": v for k, v in self._chr_accent_ur.to_dict().items()}
+        p0 = {f"path[0].{k}": v for k, v in self._chr_centre.to_dict().items()}
+        p1 = {f"path[1].{k}": v for k, v in self._chr_accent_ul.to_dict().items()}
+        p2 = {f"path[2].{k}": v for k, v in self._chr_accent_ur.to_dict().items()}
         return {**d, **p0, **p1, **p2} 
 
     def draw(self, img, highlight_ends=False):
